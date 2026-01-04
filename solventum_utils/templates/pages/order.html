@@ -29,6 +29,8 @@
     <h3 class="m-0">{{ doc.name if doc else _("Order Details") }}</h3>
 {% endblock %}
 
+
+
 {% block header_actions %}
     <div class="row">
         <div class="dropdown">
@@ -107,22 +109,24 @@
         {% endif %}
 
         <div class="order-container mt-4">
-            
+            {% set s = frappe.get_doc("QR code")  %}
+
+            {% if s.qr_code_enable %}
             {# SOLVENTUM HIJACK: UPI QR SECTION #}
             <div class="card my-4" style="border: none; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); overflow: hidden; background: #ffffff;">
                 <div class="row no-gutters d-flex align-items-stretch">
                     <div class="col-md-5 text-center p-4" style="background: #f8faff; border-right: 1px solid #eee;">
                         <h6 style="color: #007bff; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Step 1: Scan & Pay</h6>
                         <div class="py-3">
-                            <img src="/assets/solventum_utils/images/AccountQRCodeHDFC.png" 
+                            <img src={{s.qr_code}} 
                                 alt="UPI QR" 
                                 style="width: 200px; height: 200px; border: 4px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-radius: 12px;">
                         </div>
-                        <p class="mb-1" style="font-size: 1.1rem; font-weight: 700; color: #333;">VPA: 9538027519@ybl</p>
-                        <small class="text-muted">Solventum OPC Private Limited</small>
+                        <p class="mb-1" style="font-size: 1.1rem; font-weight: 700; color: #333;">VPA: {{ s.upi_id }}</p>
+                        <small class="text-muted">{{ s.company_upi_name }}</small>
                     </div>
 
-                    <div class="col-md-7 p-4 d-flex flex-column justify-content-center" id="solventum-action-area">
+                    <div class="col-md-7 p-4 d-flex flex-column justify-content-center" id="solventum-action-area"  style="display: block;">
                         <p class="text-muted">Please scan the code below to pay for : <strong>{{ doc.name }}</strong></p>
                         <h6 style="color: #28a745; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Step 2: Confirm Payment</h6>
                         <p class="text-muted mt-2">Once the UPI transfer is successful, click the button below. This alerts our team to verify your transaction instantly.</p>
@@ -136,11 +140,14 @@
                         </div>
 
                         <button id="declare-btn" class="btn btn-success btn-block btn-lg" style="background: #28a745; border: none; font-weight: bold; height: 60px; border-radius: 10px;">
-                            <i class="fa fa-check-circle"></i> I HAVE PAID THE AMOUNT
+                            <i class="fa fa-check-circle"></i>{{ s.payment_confirm_button_name }}
                         </button>
                     </div>
+
                 </div>
             </div>
+            {% endif %}
+
 
             <div class="w-100">
                 <div class="order-items order-item-header mb-1 row text-muted">
@@ -214,6 +221,8 @@
     </div>
     {% endif %}
 
+
+{% if s.qr_code_enable %}
 <script>
 frappe.ready(function() {
     // We attach the function to the button programmatically
@@ -230,8 +239,7 @@ frappe.ready(function() {
             // 2. Immediate Visual Feedback
             const area = document.getElementById('solventum-action-area');
             area.innerHTML = `
-                <div class="text-center animate__animated animate__fadeIn" 
-                    style="padding: 30px; background: #ffffff; border: 2px solid #28a745; border-radius: 15px; box-shadow: 0 10px 25px rgba(40, 167, 69, 0.1);">
+            <div class="text-center animate__animated animate__fadeIn" style="padding: 30px; background: #ffffff; border: 2px solid #28a745; border-radius: 15px; box-shadow: 0 10px 25px rgba(40, 167, 69, 0.1);">
                     
                     <div style="margin-bottom: 20px;">
                         <i class="fa fa-check-circle fa-4x" style="color: #28a745;"></i>
@@ -264,8 +272,8 @@ frappe.ready(function() {
                         <a href="mailto:kusuma.hkfindx@gmail.com" style="color: #007bff; text-decoration: none; font-weight: bold;">kusuma.hkfindx@gmail.com</a>
                     </p>
                 </div>
-            `;
-
+            `
+            
             // 3. Server Call: We nest them to ensure the Field Update happens FIRST
             frappe.call({
                 method: "frappe.client.set_value",
@@ -285,7 +293,7 @@ frappe.ready(function() {
                             reference_doctype: "{{ doc.doctype }}",
                             reference_name: "{{ doc.name }}",
                             content: `<b>PAYMENT DECLARED BY USER</b><br>Amount: ${amount}<br>Time: ${timestamp}<br>Status: Awaiting Bank Verification`,
-                            comment_email: "hello@solventumrnd.com",
+                            comment_email: "{{  s.comment_email }}",
                             comment_by: "Customer Portal"
                         },
                         callback: function(res) {
@@ -301,6 +309,7 @@ frappe.ready(function() {
     }
 });
 </script>
+{% endif %}
 
 {% endblock %}
 

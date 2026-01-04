@@ -5,6 +5,32 @@ app_description = "UPI payment gatway and other custom python scripts as needed"
 app_email = "hello@solventumrnd.com"
 app_license = "mit"
 
+required_apps = ["erpnext"]
+
+# Hijack the order portal page
+base_template_path = "solventum_utils/templates/pages/order.html"
+
+template_overrides = {
+    "templates/pages/order.html": "solventum_utils/templates/pages/order.html"
+}
+
+# This ensures that when someone installs solventum_utils, 
+# the custom field and notification are created for them automatically.
+fixtures = [
+    {
+        "dt": "Custom Field",
+        "filters": [
+            ["fieldname", "in", ["custom_payment_declared"]]
+        ]
+    },
+    {
+        "dt": "Notification",
+        "filters": [
+            ["name", "=", "Customer Payment Declaration Alert"]
+        ]
+    }
+]
+
 # Apps
 # ------------------
 

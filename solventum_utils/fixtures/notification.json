@@ -1,0 +1,45 @@
+[
+ {
+  "attach_files": "All",
+  "attach_print": 0,
+  "channel": "Email",
+  "condition": "doc.custom_payment_declared == 1",
+  "date_changed": null,
+  "days_in_advance": 0,
+  "docstatus": 0,
+  "doctype": "Notification",
+  "document_type": "Quotation",
+  "enabled": 1,
+  "event": "Value Change",
+  "from_attach_field": null,
+  "is_standard": 0,
+  "message": "<p>Hi Sales Team,</p>\r\n\r\n<h3> New payment has been declared!</h3>\r\n<p><b>Customer:</b> {{ doc.customer_name }}</p>\r\n<p><b>Amount:</b> {{ doc.get_formatted(\"grand_total\") }}</p>\r\n<p><b>Document:</b> {{ doc.name }}</p>\r\n\r\n<p>Please verify the UPI money recieved from the bank statement.</p>\r\n<a href=\"https://erp.fxp-ems.com/app/quotation/{{ doc.name }}\">View Quotation</a>\r\n\r\n<p>Regards, </br>\r\n Solventum Portal</p>",
+  "message_type": "Markdown",
+  "method": null,
+  "modified": "2026-01-04 19:55:12.496946",
+  "module": null,
+  "name": "Customer Payment Declaration Alert",
+  "print_format": "",
+  "property_value": null,
+  "recipients": [
+   {
+    "bcc": null,
+    "cc": "bcgowtham17@gmail.com",
+    "condition": null,
+    "parent": "Customer Payment Declaration Alert",
+    "parentfield": "recipients",
+    "parenttype": "Notification",
+    "receiver_by_document_field": "owner",
+    "receiver_by_role": "Sales User"
+   }
+  ],
+  "send_system_notification": 1,
+  "send_to_all_assignees": 0,
+  "sender": "Gowtham B C",
+  "sender_email": "bcgowtham17@gmail.com",
+  "set_property_after_alert": null,
+  "slack_webhook_url": null,
+  "subject": "{{ doc.name }} New payment has been declared",
+  "value_changed": "custom_payment_declared"
+ }
+]

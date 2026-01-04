@@ -1,0 +1,331 @@
+{% extends "templates/web.html" %}
+{% from "erpnext/templates/includes/macros.html" import product_image %}
+
+{# SOLVENTUM HARD-RECOVERY LOGIC #}
+{% if not doc %}
+    {# Try URL name if context is empty #}
+    {% if frappe.form_dict.name %}
+        {% set doc_name = frappe.form_dict.name %}
+        {# We check if it's a QTN or ORD based on the string prefix #}
+        {% if "QTN" in doc_name %}
+            {% set doc = frappe.get_doc("Quotation", doc_name) %}
+        {% elif "ORD" in doc_name %}
+            {% set doc = frappe.get_doc("Sales Order", doc_name) %}
+        {% endif %}
+    {% endif %}
+{% endif %}
+
+{% block breadcrumbs %}
+    {% if doc %}
+        {% include "templates/includes/breadcrumbs.html" %}
+    {% endif %}
+{% endblock %}
+
+{% block title %}
+    {{ doc.name if doc else "Order Details" }}
+{% endblock %}
+
+{% block header %}
+    <h3 class="m-0">{{ doc.name if doc else _("Order Details") }}</h3>
+{% endblock %}
+
+{% block header_actions %}
+    <div class="row">
+        <div class="dropdown">
+            <button class="btn btn-sm btn-secondary dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
+                <span class="font-md">{{ _('Actions') }}</span>
+                <b class="caret"></b>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-right" role="menu">
+                {% if doc and doc.doctype == 'Purchase Order' and show_make_pi_button %}
+                    <a class="dropdown-item"
+                        href="/api/method/erpnext.buying.doctype.purchase_order.purchase_order.make_purchase_invoice_from_portal?purchase_order_name={{ doc.name }}"
+                        data-action="make_purchase_invoice">{{ _("Make Purchase Invoice") }}
+                    </a>
+                {% endif %}
+                {% if doc %}
+                <a class="dropdown-item"
+                    href='/printview?doctype={{ doc.doctype}}&name={{ doc.name }}&format={{ print_format }}' target="_blank"
+                    rel="noopener noreferrer">
+                    {{ _("Print") }}
+                </a>
+                {% endif %}
+            </ul>
+        </div>
+        {% if show_pay_button and doc %}
+            <div class="form-column col-sm-6">
+                <div class="page-header-actions-block" data-html-block="header-actions">
+                    <p>
+                        <a href="/api/method/erpnext.accounts.doctype.payment_request.payment_request.make_payment_request?dn={{ doc.name }}&dt={{ doc.doctype }}&submit_doc=1&order_type=Shopping Cart"
+                            class="btn btn-primary btn-sm" id="pay-for-order">
+                            {{ _("Pay", null, "Amount") }} {{ pay_amount }}
+                        </a>
+                    </p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block page_content %}
+    {% if doc %}
+    <div>
+        <div class="row transaction-subheading mt-1">
+            <div class="col-6 text-muted small mt-1">
+                {{ frappe.utils.format_date(doc.transaction_date, 'medium') }}
+                {% if doc.valid_till %}
+                    <p>
+                        {{ _("Valid Till") }}: {{ frappe.utils.format_date(doc.valid_till, 'medium') }}
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row indicator-container mt-2">
+            <div class="col-10">
+                <span class="indicator-pill {{ doc.indicator_color or ("blue" if doc.docstatus==1 else "darkgrey") }}">
+                    {% if doc.doctype == "Quotation" and not doc.docstatus %}
+                        {{ _("Pending") }}
+                    {% else %}
+                        {{ _(doc.get('indicator_title')) or _(doc.status) or _("Submitted") }}
+                    {% endif %}
+                </span>
+            </div>
+            <div class="text-right col-2">
+                {%- set party_name = doc.supplier_name if doc.doctype in ['Supplier Quotation', 'Purchase Invoice', 'Purchase Order'] else doc.customer_name %}
+                <b>{{ party_name }}</b>
+
+                {% if doc.contact_display and doc.contact_display != party_name %}
+                    <br>
+                    {{ doc.contact_display }}
+                {% endif %}
+            </div>
+        </div>
+
+        {% if doc._header %}
+            {{ doc._header }}
+        {% endif %}
+
+        <div class="order-container mt-4">
+            
+            {# SOLVENTUM HIJACK: UPI QR SECTION #}
+            <div class="card my-4" style="border: none; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); overflow: hidden; background: #ffffff;">
+                <div class="row no-gutters d-flex align-items-stretch">
+                    <div class="col-md-5 text-center p-4" style="background: #f8faff; border-right: 1px solid #eee;">
+                        <h6 style="color: #007bff; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Step 1: Scan & Pay</h6>
+                        <div class="py-3">
+                            <img src="/assets/solventum_utils/images/AccountQRCodeHDFC.png" 
+                                alt="UPI QR" 
+                                style="width: 200px; height: 200px; border: 4px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-radius: 12px;">
+                        </div>
+                        <p class="mb-1" style="font-size: 1.1rem; font-weight: 700; color: #333;">VPA: 9538027519@ybl</p>
+                        <small class="text-muted">Solventum OPC Private Limited</small>
+                    </div>
+
+                    <div class="col-md-7 p-4 d-flex flex-column justify-content-center" id="solventum-action-area">
+                        <p class="text-muted">Please scan the code below to pay for : <strong>{{ doc.name }}</strong></p>
+                        <h6 style="color: #28a745; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Step 2: Confirm Payment</h6>
+                        <p class="text-muted mt-2">Once the UPI transfer is successful, click the button below. This alerts our team to verify your transaction instantly.</p>
+                        
+                        <div class="mt-3">
+                            <div style="background: #eef9f1; padding: 10px 15px; border-radius: 8px; display: inline-block; margin-bottom: 15px;">
+                                <span style="color: #28a745; font-weight: bold; font-size: 1.2rem;">
+                                    Amount: {{ doc.get_formatted("grand_total") }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <button id="declare-btn" class="btn btn-success btn-block btn-lg" style="background: #28a745; border: none; font-weight: bold; height: 60px; border-radius: 10px;">
+                            <i class="fa fa-check-circle"></i> I HAVE PAID THE AMOUNT
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="w-100">
+                <div class="order-items order-item-header mb-1 row text-muted">
+                    <span class="col-5">
+                        {{ _("Item") }}
+                    </span>
+                    <span class="d-s-n col-3">
+                        {{ _("Quantity") }}
+                    </span>
+                    <span class="col-2 pl-10">
+                        {{ _("Rate") }}
+                    </span>
+                    <span class="col-2 text-right">
+                        {{ _("Amount") }}
+                    </span>
+                </div>
+                {% for d in doc.items %}
+                <div class="order-items row align-items-center">
+                    <span class="order-item-name col-5 pr-0">
+                        {{ item_name_and_description(d) }}
+                    </span>
+
+                    <span class="d-s-n col-3 pl-10">
+                        {{ d.get_formatted("qty") }}
+                    </span>
+                    <span class="order-rate pl-4 col-2">
+                        {{ d.get_formatted("rate") }}
+                    </span>
+                    <span class="col-2 text-right">
+                        {{ d.get_formatted("amount") }}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="mt-3">
+                {% include "erpnext/templates/includes/order/order_taxes.html" %}
+            </div>
+        </div>
+    </div>
+
+    {% if attachments %}
+        <div class="order-item-table mt-4">
+            <div class="row order-items order-item-header text-muted">
+                <div class="col-sm-12 h6 text-uppercase">
+                    {{ _("Attachments") }}
+                </div>
+            </div>
+            <div class="row order-items">
+                <div class="col-sm-12">
+                    {% for attachment in attachments %}
+                    <p class="small">
+                        <a href="{{ attachment.file_url }}" target="blank"> {{ attachment.file_name }} </a>
+                    </p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if doc.terms %}
+        <div class="terms-and-condition text-muted small mt-4">
+            <hr>
+            <p>{{ doc.terms }}</p>
+        </div>
+    {% endif %}
+    
+    {% else %}
+    <div class="alert alert-warning">
+        {{ _("Buddy, we couldn't load the order details. Please refresh the page.") }}
+    </div>
+    {% endif %}
+
+<script>
+frappe.ready(function() {
+    // We attach the function to the button programmatically
+    const declareBtn = document.getElementById('declare-btn');
+    
+    if (declareBtn) {
+        declareBtn.addEventListener('click', function() {
+            // 1. Capture Data
+            const timestamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+            const amount = "{{ doc.get_formatted('grand_total') }}";
+            const docName = "{{ doc.name }}";
+            const customer = "{{ doc.customer_name }}";
+
+            // 2. Immediate Visual Feedback
+            const area = document.getElementById('solventum-action-area');
+            area.innerHTML = `
+                <div class="text-center animate__animated animate__fadeIn" 
+                    style="padding: 30px; background: #ffffff; border: 2px solid #28a745; border-radius: 15px; box-shadow: 0 10px 25px rgba(40, 167, 69, 0.1);">
+                    
+                    <div style="margin-bottom: 20px;">
+                        <i class="fa fa-check-circle fa-4x" style="color: #28a745;"></i>
+                    </div>
+                    
+                    <h3 style="color: #1a1a1a; font-weight: 800; margin-bottom: 10px;">Payment Logged!</h3>
+                    <p style="font-size: 1.1rem; color: #444;">Thanks for shopping with <b>Solventum</b>, buddy.</p>
+                    
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin: 20px 0; border-left: 5px solid #28a745;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span class="text-muted">Document:</span> <b>${docName}</b>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span class="text-muted">Amount:</span> <b style="color: #28a745; font-size: 1.2rem;">${amount}</b>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span class="text-muted">Time (IST):</span> <b>${timestamp}</b>
+                        </div>
+                    </div>
+
+                    <p class="text-muted" style="font-size: 0.95rem; line-height: 1.6;">
+                        Our team is verifying the UPI transfer. We will revert within <b>few minutes</b>. <br>
+                        <span style="color: #d9534f; font-weight: bold;">⚠️ Note: Unpaid orders will not be processed further.</span>
+                    </p>
+
+                    <hr style="margin: 20px 0;">
+
+                    <p style="font-size: 0.9rem;">
+                        <b>Need Help?</b> Contact Sales: <br>
+                        <a href="mailto:kusuma.hkfindx@gmail.com" style="color: #007bff; text-decoration: none; font-weight: bold;">kusuma.hkfindx@gmail.com</a>
+                    </p>
+                </div>
+            `;
+
+            // 3. Server Call: We nest them to ensure the Field Update happens FIRST
+            frappe.call({
+                method: "frappe.client.set_value",
+                args: {
+                    doctype: "{{ doc.doctype }}",
+                    name: "{{ doc.name }}",
+                    fieldname: "custom_payment_declared",
+                    value: 1
+                },
+                callback: function(r) {
+                    console.log("Field Updated on server");
+                    
+                    // ONLY once the field is saved, we add the comment
+                    frappe.call({
+                        method: "frappe.desk.form.utils.add_comment",
+                        args: {
+                            reference_doctype: "{{ doc.doctype }}",
+                            reference_name: "{{ doc.name }}",
+                            content: `<b>PAYMENT DECLARED BY USER</b><br>Amount: ${amount}<br>Time: ${timestamp}<br>Status: Awaiting Bank Verification`,
+                            comment_email: "hello@solventumrnd.com",
+                            comment_by: "Customer Portal"
+                        },
+                        callback: function(res) {
+                            if(!res.exc) {
+                                console.log("Comment Added & Notification Triggered");
+                                frappe.show_alert({message: __('Sales Team Notified via Email'), indicator: 'green'});
+                            }
+                        }
+                    });
+                }
+            });
+        });
+    }
+});
+</script>
+
+{% endblock %}
+
+
+{% macro item_name_and_description(d) %}
+    <div class="row item_name_and_description">
+        <div class="col-xs-4 col-sm-2 order-image-col">
+            <div class="order-image h-100">
+                {% if d.thumbnail or d.image %}
+                    {{ product_image(d.thumbnail or d.image, no_border=True) }}
+                {% else %}
+                    <div class="no-image-cart-item" style="min-height: 100px; display: flex; align-items: center; justify-content: center; background: #eee;">
+                        {{ frappe.utils.get_abbr(d.item_name) or "NA" }}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-xs-8 col-sm-10">
+            <strong>{{ d.item_code }}</strong>
+            <div class="text-muted small item-description">
+                {{ html2text(d.description or "") | truncate(140) }}
+            </div>
+            <span class="text-muted mt-2 d-l-n order-qty">
+                {{ _("Qty ") }}({{ d.get_formatted("qty") }})
+            </span>
+        </div>
+    </div>
+{% endmacro %}
